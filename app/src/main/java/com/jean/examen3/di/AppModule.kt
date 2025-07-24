@@ -34,7 +34,8 @@ object AppModule {
         return DetectedContactRepository()
     }
 
-    @Provides @Singleton
+    @Provides
+    @Singleton
     fun provideBleScanner(@ApplicationContext ctx: Context): BleScanner =
         BleScanner(ctx)
 }

@@ -13,6 +13,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun CovidContactTracingApp(
     modifier: Modifier = Modifier
 ) {
+    val vm   = hiltViewModel<AppViewModel>()
+    val ui   by vm.uiState.collectAsStateWithLifecycle()
+
+    // En cuanto sepas que el usuario ya está registrado:
+    LaunchedEffect(ui.isAlreadyRegistered) {
+        if (ui.isAlreadyRegistered) vm.startDetection()
+        else                       vm.stopDetection()
+    }
+
     val viewModel = hiltViewModel<AppViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
