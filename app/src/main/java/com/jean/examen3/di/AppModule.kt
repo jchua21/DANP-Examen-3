@@ -4,6 +4,7 @@ import android.content.Context
 import com.jean.examen3.data.local.UserDataStore
 import com.jean.examen3.data.repository.DetectedContactRepository
 import com.jean.examen3.data.repository.UserRepository
+import com.jean.examen3.presentation.BleScanner
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -32,4 +33,8 @@ object AppModule {
     fun provideDetectedContactRepository(): DetectedContactRepository {
         return DetectedContactRepository()
     }
+
+    @Provides @Singleton
+    fun provideBleScanner(@ApplicationContext ctx: Context): BleScanner =
+        BleScanner(ctx)
 }

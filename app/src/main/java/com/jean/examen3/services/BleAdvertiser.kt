@@ -1,5 +1,6 @@
 package com.jean.examen3.services
 
+import android.Manifest
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
@@ -11,6 +12,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import android.content.Context
+import androidx.annotation.RequiresPermission
 import java.util.UUID
 
 //EMISOR
@@ -43,6 +45,7 @@ class BleAdvertiser @Inject constructor(
         .build()
 
     // Función para iniciar el advertising BLE
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     fun startAdvertising() {
         if (advertiser == null) {
             Log.e("BleAdvertiser", "BLE Advertising not supported on this device")
@@ -69,6 +72,7 @@ class BleAdvertiser @Inject constructor(
     }
 
     // Función para detener el advertising BLE
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     fun stopAdvertising() {
         advertiser?.stopAdvertising(callback)
         Log.i("BleAdvertiser", "Advertising stopped") // Se detuvo la emisión
