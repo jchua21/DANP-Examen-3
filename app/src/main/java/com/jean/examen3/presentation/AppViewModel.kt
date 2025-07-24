@@ -18,7 +18,9 @@ data class RegisterUiState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
     val errorMessage: String? = null,
-    val registeredUserId: String? = null
+    val registeredUserId: String? = null,
+    val isCheckingRegistration: Boolean = true,
+    val isAlreadyRegistered: Boolean = false
 ) {
     val isValidData: Boolean
         get() = isValidFirstName && isValidLastName
@@ -30,6 +32,30 @@ class AppViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
+
+    init {
+        checkRegistrationStatus()
+    }
+
+    private fun checkRegistrationStatus() {
+        viewModelScope.launch {
+            userRepository.isUserRegistered().collect { isRegistered ->
+                _uiState.value = _uiState.value.copy(
+                    isCheckingRegistration = false,
+                    isAlreadyRegistered = isRegistered
+                )
+            }
+        }
+        
+        // Load user data if registered
+        viewModelScope.launch {
+            userRepository.getUserIdFromLocal().collect { userId ->
+                if (userId != null) {
+                    _uiState.value = _uiState.value.copy(registeredUserId = userId)
+                }
+            }
+        }
+    }
 
     fun updateFirstName(firstName: String) {
         // Solo permitir letras y espacios
@@ -74,7 +100,8 @@ class AppViewModel @Inject constructor(
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             isSuccess = true,
-                            registeredUserId = user.id
+                            registeredUserId = user.id,
+                            isAlreadyRegistered = true // This will trigger navigation to MainScreen
                         )
                     },
                     onFailure = { exception ->
