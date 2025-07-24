@@ -2,6 +2,7 @@ package com.jean.examen3.di
 
 import android.content.Context
 import com.jean.examen3.data.local.UserDataStore
+import com.jean.examen3.data.repository.DetectedContactRepository
 import com.jean.examen3.data.repository.UserRepository
 import dagger.Module
 import dagger.Provides
@@ -24,5 +25,11 @@ object AppModule {
     @Singleton
     fun provideUserRepository(userDataStore: UserDataStore): UserRepository {
         return UserRepository(userDataStore)
+    }
+
+    @Provides
+    @Singleton
+    fun provideDetectedContactRepository(): DetectedContactRepository {
+        return DetectedContactRepository()
     }
 }
