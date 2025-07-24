@@ -2,6 +2,7 @@ package com.jean.examen3.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jean.examen3.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,43 +11,44 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class RegisterUiState(
-    val nombres: String = "",
-    val apellidos: String = "",
-    val isValidNombres: Boolean = false,
-    val isValidApellidos: Boolean = false,
+    val firstName: String = "",
+    val lastName: String = "",
+    val isValidFirstName: Boolean = false,
+    val isValidLastName: Boolean = false,
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val registeredUserId: String? = null
 ) {
     val isValidData: Boolean
-        get() = isValidNombres && isValidApellidos
+        get() = isValidFirstName && isValidLastName
 }
 
 @HiltViewModel
 class AppViewModel @Inject constructor(
-
+    private val userRepository: UserRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
 
-    fun updateNombres(nombres: String) {
+    fun updateFirstName(firstName: String) {
         // Solo permitir letras y espacios
-        if (nombres.all { it.isLetter() || it.isWhitespace() }) {
-            val isValid = nombres.trim().length >= 2
+        if (firstName.all { it.isLetter() || it.isWhitespace() }) {
+            val isValid = firstName.trim().length >= 2
             _uiState.value = _uiState.value.copy(
-                nombres = nombres,
-                isValidNombres = isValid
+                firstName = firstName,
+                isValidFirstName = isValid
             )
         }
     }
 
-    fun updateApellidos(apellidos: String) {
+    fun updateLastName(lastName: String) {
         // Solo permitir letras y espacios
-        if (apellidos.all { it.isLetter() || it.isWhitespace() }) {
-            val isValid = apellidos.trim().length >= 2
+        if (lastName.all { it.isLetter() || it.isWhitespace() }) {
+            val isValid = lastName.trim().length >= 2
             _uiState.value = _uiState.value.copy(
-                apellidos = apellidos,
-                isValidApellidos = isValid
+                lastName = lastName,
+                isValidLastName = isValid
             )
         }
     }
@@ -62,29 +64,37 @@ class AppViewModel @Inject constructor(
                     errorMessage = null
                 )
 
-                // Simular envío de datos
-                kotlinx.coroutines.delay(2000)
-
-                // Aquí iría la lógica para enviar los datos
-                sendDataToServer(currentState.nombres.trim(), currentState.apellidos.trim())
-
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    isSuccess = true
+                val result = userRepository.registerUser(
+                    firstName = currentState.firstName.trim(),
+                    lastName = currentState.lastName.trim()
+                )
+                
+                result.fold(
+                    onSuccess = { user ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isSuccess = true,
+                            registeredUserId = user.id
+                        )
+                    },
+                    onFailure = { exception ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = "Error al registrar usuario: ${exception.message}"
+                        )
+                    }
                 )
 
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "Error al registrar: ${e.message}"
+                    errorMessage = "Error inesperado: ${e.message}"
                 )
             }
         }
     }
 
-    private suspend fun sendDataToServer(nombres: String, apellidos: String) {
-        // Aquí va la lógica para enviar los datos al servidor/nube
-        println("Enviando datos: $nombres $apellidos")
-
+    fun resetState() {
+        _uiState.value = RegisterUiState()
     }
 }

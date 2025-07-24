@@ -50,7 +50,7 @@ fun RegisterScreen(
     // Manejar el éxito del registro
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) {
-            onSuccessRegister(uiState.nombres.trim(), uiState.apellidos.trim())
+            onSuccessRegister(uiState.firstName.trim(), uiState.lastName.trim())
         }
     }
 
@@ -88,34 +88,34 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(48.dp))
 
-        // Campo Nombres
+        // Campo First Name
         OutlinedTextField(
-            value = uiState.nombres,
-            onValueChange = { viewModel.updateNombres(it) },
+            value = uiState.firstName,
+            onValueChange = { viewModel.updateFirstName(it) },
             label = { Text("Nombres") },
             placeholder = { Text("Juan Carlos") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = if (uiState.isValidNombres) Color.Green else Color(0xFF2196F3)
+                focusedBorderColor = if (uiState.isValidFirstName) Color.Green else Color(0xFF2196F3)
             ),
             enabled = !uiState.isLoading
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Campo Apellidos
+        // Campo Last Name
         OutlinedTextField(
-            value = uiState.apellidos,
-            onValueChange = { viewModel.updateApellidos(it) },
+            value = uiState.lastName,
+            onValueChange = { viewModel.updateLastName(it) },
             label = { Text("Apellidos") },
             placeholder = { Text("Pérez García") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = if (uiState.isValidApellidos) Color.Green else Color(0xFF2196F3)
+                focusedBorderColor = if (uiState.isValidLastName) Color.Green else Color(0xFF2196F3)
             ),
             enabled = !uiState.isLoading
         )
