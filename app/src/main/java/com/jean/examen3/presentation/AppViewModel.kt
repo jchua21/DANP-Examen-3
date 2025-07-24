@@ -1,7 +1,9 @@
 package com.jean.examen3.presentation
 
-import android.util.Log
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.annotation.VisibleForTesting
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jean.examen3.data.local.UserDataStore
@@ -9,14 +11,16 @@ import com.jean.examen3.data.repository.DetectedContactRepository
 import com.jean.examen3.data.repository.UserRepository
 import com.jean.examen3.services.BleAdvertiser
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import javax.inject.Inject
-import androidx.annotation.RequiresPermission
-import android.Manifest
+import android.content.Context
 
 
 /**
@@ -32,7 +36,8 @@ data class RegisterUiState(
     val errorMessage: String? = null,
     val registeredUserId: String? = null,
     val isCheckingRegistration: Boolean = true,
-    val isAlreadyRegistered: Boolean = false
+    val isAlreadyRegistered: Boolean = false,
+    val isScanningActive: Boolean = false
 ) {
     val isValidData: Boolean
         get() = isValidFirstName && isValidLastName
@@ -44,11 +49,16 @@ class AppViewModel @Inject constructor(
     private val detectedContactRepo: DetectedContactRepository,
     private val userDataStore: UserDataStore,
     private val bleScanner: BleScanner,
-    private val bleAdvertiser: BleAdvertiser
+    private val bleAdvertiser: BleAdvertiser,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
+
+    // Job para controlar el escaneo periódico
+    private var periodicScanJob: Job? = null
+    private var isScanning = false
 
     init {
         checkRegistrationStatus()
@@ -133,48 +143,154 @@ class AppViewModel @Inject constructor(
         }
     }
 
-
-    /** Inicia el escaneo BLE y guarda cada contacto */
-    @RequiresPermission(allOf = [
-        Manifest.permission.BLUETOOTH_SCAN,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ])
+    /** Inicia el escaneo BLE periódico cada minuto */
     fun startDetection() {
-        viewModelScope.launch {
-            val myId = userDataStore.getUserId().firstOrNull() ?: return@launch
-            bleScanner.startScan { detectedId, rssi, timestamp ->
-                Log.d("AppViewModel", "Escaneando dispositivo: $detectedId")
-                viewModelScope.launch {
-                    val result = detectedContactRepo.insertDetectedContact(
-                        detectorUserId = myId,
-                        detectedUserId = detectedId,
-                        rssi = rssi,
-                        detectedAt = timestamp
-                    )
-                    Log.d("AppViewModel", "Resultado BD: ${if(result.isSuccess) "ÉXITO" else "ERROR: ${result.exceptionOrNull()?.message}"}")
+        // Cancela cualquier escaneo previo
+        periodicScanJob?.cancel()
+        
+        periodicScanJob = viewModelScope.launch {
+            try {
+                // Check permissions first
+                if (!hasBluetoothPermissions()) {
+                    android.util.Log.e("AppViewModel", "Missing Bluetooth permissions for scanning")
+                    return@launch
                 }
+
+                val myId = userDataStore.getUserId().firstOrNull()
+                if (myId == null) {
+                    android.util.Log.e("AppViewModel", "No user ID found, cannot start detection")
+                    return@launch
+                }
+                
+                android.util.Log.d("AppViewModel", "Starting periodic BLE detection (every 1 minute) with user ID: $myId")
+                
+                // Lista temporal para almacenar contactos detectados en este ciclo
+                val detectedContacts = mutableSetOf<String>()
+                
+                while (true) {
+                    try {
+                        isScanning = true
+                        android.util.Log.d("AppViewModel", "Starting 1-minute scan cycle...")
+                        _uiState.value = _uiState.value.copy(isScanningActive = true)
+                        
+                        // Limpiar contactos del ciclo anterior
+                        detectedContacts.clear()
+                        
+                        bleScanner.startScan { detectedId, rssi, timestamp ->
+                            // Solo procesar si no hemos detectado este contacto en este ciclo
+                            if (detectedContacts.add(detectedId)) {
+                                // Launch a new coroutine for each unique contact detection
+                                viewModelScope.launch {
+                                    try {
+                                        android.util.Log.d("AppViewModel", "New contact detected in cycle: $detectedId with RSSI: $rssi")
+                                        val result = detectedContactRepo.insertDetectedContact(
+                                            detectorUserId = myId,
+                                            detectedUserId = detectedId,
+                                            rssi = rssi,
+                                            detectedAt = timestamp
+                                        )
+                                        result.fold(
+                                            onSuccess = { 
+                                                android.util.Log.d("AppViewModel", "Contact saved successfully: ${it.id}")
+                                            },
+                                            onFailure = { 
+                                                android.util.Log.e("AppViewModel", "Failed to save contact: ${it.message}")
+                                            }
+                                        )
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("AppViewModel", "Error saving contact: ${e.message}")
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Escanear por 1 minuto (60 segundos)
+                        delay(60_000)
+                        
+                        // Detener el escaneo
+                        bleScanner.stopScan()
+                        isScanning = false
+                        _uiState.value = _uiState.value.copy(isScanningActive = false)
+                        
+                        android.util.Log.d("AppViewModel", "Completed scan cycle. Detected ${detectedContacts.size} unique contacts")
+                        
+                        // Pequeña pausa antes del siguiente ciclo (opcional, para evitar sobrecarga)
+                        delay(1_000) // 1 segundo de pausa
+                        
+                    } catch (e: Exception) {
+                        android.util.Log.e("AppViewModel", "Error during scan cycle: ${e.message}")
+                        isScanning = false
+                        // Esperar antes de reintentar
+                        delay(5_000) // 5 segundos antes de reintentar
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Error starting periodic detection: ${e.message}")
+                isScanning = false
             }
         }
     }
 
-    /** Detiene el escaneo BLE */
-    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
+    /** Detiene el escaneo BLE periódico */
     fun stopDetection() {
-        bleScanner.stopScan()
+        try {
+            android.util.Log.d("AppViewModel", "Stopping periodic BLE detection")
+            
+            // Cancelar el job periódico
+            periodicScanJob?.cancel()
+            periodicScanJob = null
+            
+            // Detener escaneo actual si está activo
+            if (isScanning) {
+                if (!hasBluetoothPermissions()) {
+                    android.util.Log.e("AppViewModel", "Missing Bluetooth permissions for stopping scan")
+                    return
+                }
+                bleScanner.stopScan()
+                isScanning = false
+            }
+            
+            // Actualizar UI state
+            _uiState.value = _uiState.value.copy(isScanningActive = false)
+            
+            android.util.Log.d("AppViewModel", "Periodic BLE detection stopped")
+        } catch (e: Exception) {
+            android.util.Log.e("AppViewModel", "Error stopping periodic detection: ${e.message}")
+        }
     }
 
     /** Inicia la emisión BLE */
-    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     fun startAdvertising() {
-        Log.d("AppViewModel", "Iniciando advertising BLE")
+        if (!hasBluetoothPermissions()) {
+            android.util.Log.e("AppViewModel", "Missing Bluetooth permissions for advertising")
+            return
+        }
         bleAdvertiser.startAdvertising()
     }
 
     /** Detiene la emisión BLE */
-    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     fun stopAdvertising() {
-        Log.d("AppViewModel", "Deteniendo advertising BLE")
+        if (!hasBluetoothPermissions()) {
+            android.util.Log.e("AppViewModel", "Missing Bluetooth permissions for stopping advertising")
+            return
+        }
         bleAdvertiser.stopAdvertising()
     }
 
+    /** Check if app has required Bluetooth permissions */
+    private fun hasBluetoothPermissions(): Boolean {
+        val bluetoothScan = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.BLUETOOTH_SCAN
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val bluetoothAdvertise = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.BLUETOOTH_ADVERTISE
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val fineLocation = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        return bluetoothScan && bluetoothAdvertise && fineLocation
+    }
 }

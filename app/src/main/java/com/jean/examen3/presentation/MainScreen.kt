@@ -9,11 +9,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jean.examen3.services.BleAdvertiseService
 
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val viewModel = hiltViewModel<AppViewModel>()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var isAdvertising by remember { mutableStateOf(false) }
 
     Column(
@@ -22,6 +26,36 @@ fun MainScreen(modifier: Modifier = Modifier) {
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
+        // Estado del escaneo periódico
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = if (uiState.isScanningActive) 
+                    MaterialTheme.colorScheme.primaryContainer 
+                else 
+                    MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "Detección de Contactos",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (uiState.isScanningActive) 
+                        "Escaneando contactos cada minuto..." 
+                    else 
+                        "Detección inactiva",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
         Text(
             text = if (isAdvertising) "Emisión BLE activa" else "Emisión BLE inactiva",
             style = MaterialTheme.typography.titleLarge
