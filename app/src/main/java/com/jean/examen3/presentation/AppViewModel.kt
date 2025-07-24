@@ -1,5 +1,6 @@
 package com.jean.examen3.presentation
 
+import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,6 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.annotation.RequiresPermission
+import android.Manifest
 
 
 /**
@@ -130,34 +133,48 @@ class AppViewModel @Inject constructor(
         }
     }
 
+
     /** Inicia el escaneo BLE y guarda cada contacto */
+    @RequiresPermission(allOf = [
+        Manifest.permission.BLUETOOTH_SCAN,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ])
     fun startDetection() {
         viewModelScope.launch {
             val myId = userDataStore.getUserId().firstOrNull() ?: return@launch
             bleScanner.startScan { detectedId, rssi, timestamp ->
+                Log.d("AppViewModel", "Escaneando dispositivo: $detectedId")
                 viewModelScope.launch {
-                    detectedContactRepo.insertDetectedContact(
-                        detectorUserId  = myId,
-                        detectedUserId  = detectedId,
-                        rssi            = rssi,
-                        detectedAt      = timestamp
+                    val result = detectedContactRepo.insertDetectedContact(
+                        detectorUserId = myId,
+                        detectedUserId = detectedId,
+                        rssi = rssi,
+                        detectedAt = timestamp
                     )
+                    Log.d("AppViewModel", "Resultado BD: ${if(result.isSuccess) "ÉXITO" else "ERROR: ${result.exceptionOrNull()?.message}"}")
                 }
             }
         }
     }
 
     /** Detiene el escaneo BLE */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     fun stopDetection() {
         bleScanner.stopScan()
     }
+
     /** Inicia la emisión BLE */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     fun startAdvertising() {
+        Log.d("AppViewModel", "Iniciando advertising BLE")
         bleAdvertiser.startAdvertising()
     }
 
     /** Detiene la emisión BLE */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     fun stopAdvertising() {
+        Log.d("AppViewModel", "Deteniendo advertising BLE")
         bleAdvertiser.stopAdvertising()
     }
+
 }
