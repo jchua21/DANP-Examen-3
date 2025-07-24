@@ -18,8 +18,13 @@ fun CovidContactTracingApp(
 
     // En cuanto sepas que el usuario ya está registrado:
     LaunchedEffect(ui.isAlreadyRegistered) {
-        if (ui.isAlreadyRegistered) vm.startDetection()
-        else                       vm.stopDetection()
+        if (ui.isAlreadyRegistered) {
+            vm.startDetection()
+            vm.startAdvertising()
+        } else {
+            vm.stopDetection()
+            vm.stopAdvertising()
+        }
     }
 
     val viewModel = hiltViewModel<AppViewModel>()

@@ -5,6 +5,7 @@ import com.jean.examen3.data.local.UserDataStore
 import com.jean.examen3.data.repository.DetectedContactRepository
 import com.jean.examen3.data.repository.UserRepository
 import com.jean.examen3.presentation.BleScanner
+import com.jean.examen3.services.BleAdvertiser
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,4 +39,9 @@ object AppModule {
     @Singleton
     fun provideBleScanner(@ApplicationContext ctx: Context): BleScanner =
         BleScanner(ctx)
+
+    @Provides
+    @Singleton
+    fun provideBleAdvertiser(@ApplicationContext context: Context, userDataStore: UserDataStore): BleAdvertiser =
+        BleAdvertiser(context, userDataStore)
 }

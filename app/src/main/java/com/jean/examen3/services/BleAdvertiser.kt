@@ -1,6 +1,5 @@
 package com.jean.examen3.services
 
-import android.Manifest
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
@@ -12,13 +11,15 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import android.content.Context
-import androidx.annotation.RequiresPermission
+import com.jean.examen3.data.local.UserDataStore
 import java.util.UUID
-
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
 //EMISOR
 @Singleton
 class BleAdvertiser @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val userDataStore: UserDataStore
 ) {
     // Obtiene el objeto que permite hacer advertising BLE (si el dispositivo lo soporta)
     private val advertiser: BluetoothLeAdvertiser? =
@@ -41,11 +42,21 @@ class BleAdvertiser @Inject constructor(
     // Datos que se van a emitir en la señal BLE
     private val data = AdvertiseData.Builder()
         .setIncludeDeviceName(false) // No incluye el nombre del dispositivo en la señal
-        .addServiceUuid(ParcelUuid(SERVICE_UUID)) // Solo emite el UUID como identificador
+        .addServiceUuid(ParcelUuid(getServiceUuid())) // Solo emite el UUID como identificador
         .build()
 
+    private fun getServiceUuid(): UUID {
+        return runBlocking {
+            val userId = userDataStore.getUserId().firstOrNull()
+            if (userId != null) {
+                UUID.fromString(userId)
+            } else {
+                UUID.fromString("12345678-1234-1234-1234-1234567890ab")
+            }
+        }
+    }
+
     // Función para iniciar el advertising BLE
-    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     fun startAdvertising() {
         if (advertiser == null) {
             Log.e("BleAdvertiser", "BLE Advertising not supported on this device")
@@ -72,7 +83,6 @@ class BleAdvertiser @Inject constructor(
     }
 
     // Función para detener el advertising BLE
-    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     fun stopAdvertising() {
         advertiser?.stopAdvertising(callback)
         Log.i("BleAdvertiser", "Advertising stopped") // Se detuvo la emisión

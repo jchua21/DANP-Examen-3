@@ -29,7 +29,7 @@ class BleScanner(private val context: Context) {
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val rssi = result.rssi
-            val detectedId = parseUuid(result)
+            val detectedId = parseUuid(result) ?: return // Si no hay UUID, no procesar
             val timestamp = getCurrentIsoTimestamp()
             val distance = estimateDistance(rssi)
 
@@ -71,10 +71,9 @@ class BleScanner(private val context: Context) {
     /**
      * Extrae el UUID del servicio anunciado o, si no existe, usa la dirección MAC.
      */
-    private fun parseUuid(result: ScanResult): String {
+    private fun parseUuid(result: ScanResult): String? {
         val serviceUuids = result.scanRecord?.serviceUuids
         return serviceUuids?.firstOrNull()?.uuid?.toString()
-            ?: result.device.address
     }
 
     /**

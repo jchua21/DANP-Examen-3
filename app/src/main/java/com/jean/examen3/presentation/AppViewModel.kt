@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.jean.examen3.data.local.UserDataStore
 import com.jean.examen3.data.repository.DetectedContactRepository
 import com.jean.examen3.data.repository.UserRepository
+import com.jean.examen3.services.BleAdvertiser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +40,8 @@ class AppViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val detectedContactRepo: DetectedContactRepository,
     private val userDataStore: UserDataStore,
-    private val bleScanner: BleScanner
+    private val bleScanner: BleScanner,
+    private val bleAdvertiser: BleAdvertiser
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RegisterUiState())
@@ -48,6 +50,7 @@ class AppViewModel @Inject constructor(
     init {
         checkRegistrationStatus()
     }
+
 
     private fun checkRegistrationStatus() {
         viewModelScope.launch {
@@ -147,5 +150,14 @@ class AppViewModel @Inject constructor(
     /** Detiene el escaneo BLE */
     fun stopDetection() {
         bleScanner.stopScan()
+    }
+    /** Inicia la emisión BLE */
+    fun startAdvertising() {
+        bleAdvertiser.startAdvertising()
+    }
+
+    /** Detiene la emisión BLE */
+    fun stopAdvertising() {
+        bleAdvertiser.stopAdvertising()
     }
 }
